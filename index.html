@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>領収書登録デモ</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f7f7f7;
+      margin: 0;
+      padding: 24px;
+    }
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    p {
+      color: #555;
+      line-height: 1.6;
+    }
+    input[type="file"] {
+      margin-top: 16px;
+      width: 100%;
+    }
+    button {
+      margin-top: 16px;
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: black;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .note {
+      margin-top: 14px;
+      font-size: 13px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>領収書登録デモ</h1>
+      <p>
+        領収書をその場で撮影、または既存の写真をアップロードできます。<br>
+        複数枚アップロードにも対応予定です。
+      </p>
+
+      <input type="file" accept="image/*" multiple capture="environment">
+
+      <button onclick="alert('次に読み取り結果確認画面へ進む想定です')">
+        読み取り結果を確認する
+      </button>
+
+      <div class="note">
+        ※ これはデモ画面です。今後、GASとスプレッドシート連携を追加予定です。
+      </div>
+    </div>
+  </div>
+</body>
+</html>
