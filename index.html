@@ -29,12 +29,20 @@
       color: #555;
       line-height: 1.6;
     }
+    .section {
+      margin-top: 20px;
+    }
+    .label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
     input[type="file"] {
-      margin-top: 16px;
       width: 100%;
+      margin-top: 8px;
     }
     button {
-      margin-top: 16px;
+      margin-top: 20px;
       width: 100%;
       padding: 14px;
       border: none;
@@ -49,6 +57,12 @@
       font-size: 13px;
       color: #888;
     }
+    .preview {
+      margin-top: 16px;
+      font-size: 14px;
+      color: #333;
+      white-space: pre-line;
+    }
   </style>
 </head>
 <body>
@@ -56,11 +70,32 @@
     <div class="card">
       <h1>領収書登録デモ</h1>
       <p>
-        領収書をその場で撮影、または既存の写真をアップロードできます。<br>
-        複数枚アップロードにも対応予定です。
+        領収書をその場で撮影、または既存の写真を複数枚アップロードできます。
       </p>
 
-      <input type="file" accept="image/*" multiple capture="environment">
+      <div class="section">
+        <label class="label" for="cameraInput">カメラで撮影</label>
+        <input
+          id="cameraInput"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onchange="showSelectedFiles()"
+        >
+      </div>
+
+      <div class="section">
+        <label class="label" for="photoInput">写真を選択（複数枚可）</label>
+        <input
+          id="photoInput"
+          type="file"
+          accept="image/*"
+          multiple
+          onchange="showSelectedFiles()"
+        >
+      </div>
+
+      <div id="preview" class="preview">まだ画像は選択されていません。</div>
 
       <button onclick="alert('次に読み取り結果確認画面へ進む想定です')">
         読み取り結果を確認する
@@ -71,5 +106,35 @@
       </div>
     </div>
   </div>
+
+  <script>
+    function showSelectedFiles() {
+      const cameraFiles = document.getElementById('cameraInput').files;
+      const photoFiles = document.getElementById('photoInput').files;
+      const preview = document.getElementById('preview');
+
+      let text = '';
+
+      if (cameraFiles.length > 0) {
+        text += '【カメラで撮影】\n';
+        for (let i = 0; i < cameraFiles.length; i++) {
+          text += '- ' + cameraFiles[i].name + '\n';
+        }
+      }
+
+      if (photoFiles.length > 0) {
+        text += '【写真を選択】\n';
+        for (let i = 0; i < photoFiles.length; i++) {
+          text += '- ' + photoFiles[i].name + '\n';
+        }
+      }
+
+      if (text === '') {
+        text = 'まだ画像は選択されていません。';
+      }
+
+      preview.textContent = text;
+    }
+  </script>
 </body>
 </html>
