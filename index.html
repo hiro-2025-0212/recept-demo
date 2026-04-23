@@ -754,10 +754,6 @@
           var pct = Math.round((processedCount / total) * 100);
           setStatus('processing', '完了 ' + processedCount + '/' + total, pct);
 
-          if (idx + 1 < imageList.length) {
-            setStatus('processing', '次のファイルを準備中...', pct);
-            return delay(500);
-          }
         }).then(function() {
           processOne(idx + 1);
         });
