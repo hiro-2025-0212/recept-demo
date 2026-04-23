@@ -3,137 +3,1007 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>領収書登録デモ</title>
+  <title>領収書登録</title>
   <style>
+    * { box-sizing: border-box; }
+
     body {
-      font-family: sans-serif;
-      background: #f7f7f7;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f5f7;
       margin: 0;
-      padding: 24px;
+      padding: 16px;
+      color: #1a1a1a;
     }
+
     .container {
       max-width: 480px;
       margin: 0 auto;
     }
+
     .card {
       background: white;
       border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      padding: 24px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     }
+
     h1 {
-      font-size: 24px;
-      margin-bottom: 8px;
+      font-size: 22px;
+      margin: 0 0 4px;
     }
-    p {
-      color: #555;
-      line-height: 1.6;
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin: 0 0 20px;
+      line-height: 1.5;
     }
-    .section {
-      margin-top: 20px;
+
+    .upload-section {
+      margin-bottom: 16px;
     }
-    .label {
-      display: block;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-    input[type="file"] {
+
+    .upload-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       width: 100%;
-      margin-top: 8px;
-    }
-    button {
-      margin-top: 20px;
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 10px;
-      background: black;
-      color: white;
-      font-size: 16px;
+      padding: 14px 16px;
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      background: #fafafa;
+      font-size: 15px;
+      color: #333;
       cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
     }
-    .note {
-      margin-top: 14px;
+
+    .upload-btn:hover {
+      border-color: #888;
+      background: #f0f0f0;
+    }
+
+    .upload-btn .icon {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .upload-btn input[type="file"] {
+      display: none;
+    }
+
+    .file-count {
       font-size: 13px;
       color: #888;
+      margin-top: 8px;
+      min-height: 20px;
     }
-    .preview {
+
+    .thumbnail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
       margin-top: 16px;
+    }
+
+    .thumb-item {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #eee;
+    }
+
+    .thumb-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .thumb-item .remove-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      color: white;
       font-size: 14px;
+      line-height: 24px;
+      text-align: center;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .thumb-item .remove-btn:hover {
+      background: rgba(220,50,50,0.8);
+    }
+
+    .thumb-item .file-name {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 2px 6px;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .thumb-item .pdf-icon {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #e8e8e8;
+      font-size: 13px;
+      font-weight: 700;
+      color: #c0392b;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 24px 0;
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    .primary-btn {
+      margin-top: 20px;
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      background: #111;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .primary-btn:hover {
+      background: #333;
+    }
+
+    .primary-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .secondary-btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 14px;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+      background: white;
       color: #333;
-      white-space: pre-line;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .secondary-btn:hover {
+      border-color: #999;
+    }
+
+    .status-bar {
+      margin-top: 12px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .status-bar.processing {
+      display: block;
+      background: #eef6ff;
+      color: #1a6dd4;
+    }
+
+    .status-bar.done {
+      display: block;
+      background: #eafbe7;
+      color: #1a7d1a;
+    }
+
+    .status-bar.error {
+      display: block;
+      background: #ffeaea;
+      color: #d41a1a;
+    }
+
+    .progress-bar-track {
+      height: 4px;
+      background: #ddd;
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: #1a6dd4;
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    /* --- 確認画面 --- */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    .receipt-card {
+      background: #f9f9f9;
+      border: 1px solid #e8e8e8;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .receipt-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .receipt-thumb {
+      width: 64px;
+      height: 64px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: #ddd;
+    }
+
+    .receipt-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #333;
+    }
+
+    .receipt-file {
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+      word-break: break-all;
+    }
+
+    .ai-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      color: #1a6dd4;
+      background: #e8f0fe;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .ai-badge.manual {
+      color: #b45309;
+      background: #fef3c7;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 4px;
+    }
+
+    .form-input,
+    .form-select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #1a1a1a;
+      background: white;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      outline: none;
+      border-color: #1a6dd4;
+      box-shadow: 0 0 0 3px rgba(26,109,212,0.1);
+    }
+
+    .form-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+
+    .confirm-summary {
+      background: #f0f4ff;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: #1a1a1a;
+    }
+
+    .confirm-summary strong {
+      font-size: 20px;
+    }
+
+    .done-icon {
+      font-size: 48px;
+      text-align: center;
+      margin: 20px 0 10px;
+    }
+
+    .done-message {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .done-detail {
+      text-align: center;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 20px;
+      line-height: 1.6;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="card">
-      <h1>領収書登録デモ</h1>
-      <p>
-        領収書をその場で撮影、または既存の写真を複数枚アップロードできます。
-      </p>
 
-      <div class="section">
-        <label class="label" for="cameraInput">カメラで撮影</label>
-        <input
-          id="cameraInput"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onchange="showSelectedFiles()"
-        >
-      </div>
+    <!-- ===== 画面1: 画像選択 ===== -->
+    <div id="screenUpload" class="screen active">
+      <div class="card">
+        <h1>領収書登録</h1>
+        <p class="subtitle">
+          領収書を撮影、または写真を選択してアップロードできます。
+        </p>
 
-      <div class="section">
-        <label class="label" for="photoInput">写真を選択（複数枚可）</label>
-        <input
-          id="photoInput"
-          type="file"
-          accept="image/*"
-          multiple
-          onchange="showSelectedFiles()"
-        >
-      </div>
+        <div class="upload-section">
+          <label class="upload-btn">
+            <span class="icon">&#128247;</span>
+            <span>カメラで撮影</span>
+            <input
+              id="cameraInput"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onchange="onFilesSelected(this.files, 'camera')"
+            >
+          </label>
+        </div>
 
-      <div id="preview" class="preview">まだ画像は選択されていません。</div>
+        <div class="upload-section">
+          <label class="upload-btn">
+          <span class="icon">&#128444;&#65039;</span>
+          <span>写真・PDFを選択（複数可）</span>
+          <input
+            id="photoInput"
+            type="file"
+            accept="image/*,.pdf,.heic,.heif,.avif,.bmp,.tiff,.tif"
+            multiple
+            onchange="onFilesSelected(this.files, 'photo')"
+          >
+          </label>
+        </div>
 
-      <button onclick="alert('次に読み取り結果確認画面へ進む想定です')">
-        読み取り結果を確認する
-      </button>
+        <div class="file-count" id="fileCount"></div>
 
-      <div class="note">
-        ※ これはデモ画面です。今後、GASとスプレッドシート連携を追加予定です。
+        <div id="thumbnailArea">
+          <div class="empty-state" id="emptyState">画像が選択されていません</div>
+          <div class="thumbnail-grid" id="thumbnailGrid"></div>
+        </div>
+
+        <div class="status-bar" id="statusBar">
+          <span id="statusText"></span>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progressFill"></div>
+          </div>
+        </div>
+
+        <button class="primary-btn" id="submitBtn" disabled onclick="handleSubmit()">
+          読み取り結果を確認する
+        </button>
       </div>
     </div>
+
+    <!-- ===== 画面2: 確認・修正 ===== -->
+    <div id="screenConfirm" class="screen">
+      <div class="card">
+        <h1>内容の確認・修正</h1>
+        <p class="subtitle">
+          AIが読み取った内容を確認し、間違いがあればその場で修正してください。
+        </p>
+
+        <div class="confirm-summary" id="confirmSummary"></div>
+
+        <div id="receiptForms"></div>
+
+        <button class="primary-btn" onclick="handleSave()">
+          確定して保存する
+        </button>
+        <button class="secondary-btn" onclick="goBack()">
+          戻って画像を選び直す
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== 画面3: 完了 ===== -->
+    <div id="screenDone" class="screen">
+      <div class="card">
+        <div class="done-icon">&#9989;</div>
+        <div class="done-message">登録が完了しました</div>
+        <div class="done-detail" id="doneDetail"></div>
+
+        <button class="primary-btn" onclick="resetAll()">
+          新しい領収書を登録する
+        </button>
+      </div>
+    </div>
+
   </div>
 
   <script>
-    function showSelectedFiles() {
-      const cameraFiles = document.getElementById('cameraInput').files;
-      const photoFiles = document.getElementById('photoInput').files;
-      const preview = document.getElementById('preview');
+    var imageList = [];
+    var SUPPORTED_TYPES = null; // 全形式を受け入れる（Gemini側で判別）
+    var MAX_LONG_SIDE = 1200;
+    var JPEG_QUALITY = 0.65;
 
-      let text = '';
+    var CATEGORIES = [
+      'タクシー代',
+      '新幹線',
+      '交通費（電車）',
+      '飲食',
+      '駐車／ガソリン',
+      'スーパー（社内飲み買い出し）',
+      '雑費（消耗品・備品）',
+      '諸会費（交流会費）'
+    ];
 
-      if (cameraFiles.length > 0) {
-        text += '【カメラで撮影】\n';
-        for (let i = 0; i < cameraFiles.length; i++) {
-          text += '- ' + cameraFiles[i].name + '\n';
+    // --- 画面切り替え ---
+    function showScreen(id) {
+      var screens = document.querySelectorAll('.screen');
+      for (var i = 0; i < screens.length; i++) {
+        screens[i].classList.remove('active');
+      }
+      document.getElementById(id).classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    // --- 画面1: 画像選択 ---
+    function onFilesSelected(fileList, source) {
+      var files = Array.from(fileList);
+
+      for (var j = 0; j < files.length; j++) {
+        var file = files[j];
+        var url = URL.createObjectURL(file);
+        imageList.push({ file: file, url: url, source: source });
+      }
+
+      var input = source === 'camera'
+        ? document.getElementById('cameraInput')
+        : document.getElementById('photoInput');
+      input.value = '';
+
+      renderThumbnails();
+    }
+
+    function removeImage(index) {
+      URL.revokeObjectURL(imageList[index].url);
+      imageList.splice(index, 1);
+      renderThumbnails();
+    }
+
+    function renderThumbnails() {
+      var grid = document.getElementById('thumbnailGrid');
+      var empty = document.getElementById('emptyState');
+      var count = document.getElementById('fileCount');
+      var btn = document.getElementById('submitBtn');
+
+      grid.innerHTML = '';
+
+      if (imageList.length === 0) {
+        empty.style.display = 'block';
+        count.textContent = '';
+        btn.disabled = true;
+        return;
+      }
+
+      empty.style.display = 'none';
+      count.textContent = imageList.length + '件のファイルが選択されています';
+      btn.disabled = false;
+
+      for (var i = 0; i < imageList.length; i++) {
+        (function(idx) {
+          var item = imageList[idx];
+          var div = document.createElement('div');
+          div.className = 'thumb-item';
+
+          var visual;
+          if (isImageType(item.file)) {
+            visual = document.createElement('img');
+            visual.src = item.url;
+            visual.alt = item.file.name;
+          } else {
+            visual = document.createElement('div');
+            visual.className = 'pdf-icon';
+            var ext = item.file.name.split('.').pop().toUpperCase();
+            visual.textContent = ext || 'FILE';
+          }
+
+          var removeBtn = document.createElement('button');
+          removeBtn.className = 'remove-btn';
+          removeBtn.textContent = '\u2715';
+          removeBtn.onclick = function(e) {
+            e.preventDefault();
+            removeImage(idx);
+          };
+
+          var nameLabel = document.createElement('div');
+          nameLabel.className = 'file-name';
+          nameLabel.textContent = item.file.name;
+
+          div.appendChild(visual);
+          div.appendChild(removeBtn);
+          div.appendChild(nameLabel);
+          grid.appendChild(div);
+        })(i);
+      }
+    }
+
+    // --- ファイルをBase64に変換 ---
+    function fileToBase64(file) {
+      return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function() { resolve(reader.result); };
+        reader.onerror = function() { reject(new Error('ファイル読み込み失敗')); };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function isImageType(file) {
+      if (file.type && file.type.startsWith('image/')) return true;
+      var ext = file.name.toLowerCase().split('.').pop();
+      return ['jpg','jpeg','png','gif','webp','bmp','tiff','tif','heic','heif','avif'].indexOf(ext) !== -1;
+    }
+
+    // --- リサイズ（画像のみ。PDF等はそのままBase64） ---
+    // 戻り値: { base64, mimeType }
+    function processFile(file) {
+      if (!isImageType(file)) {
+        return fileToBase64(file).then(function(base64) {
+          return { base64: base64, mimeType: file.type || 'application/octet-stream' };
+        });
+      }
+
+      return createImageBitmap(file).then(function(bitmap) {
+        var longer = Math.max(bitmap.width, bitmap.height);
+        var scale = longer > MAX_LONG_SIDE ? MAX_LONG_SIDE / longer : 1;
+
+        var w = Math.round(bitmap.width * scale);
+        var h = Math.round(bitmap.height * scale);
+
+        var canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0, w, h);
+        bitmap.close();
+
+        return { base64: canvas.toDataURL('image/jpeg', JPEG_QUALITY), mimeType: 'image/jpeg' };
+      }).catch(function() {
+        // createImageBitmap非対応の形式（HEIC等）はそのまま送る
+        return fileToBase64(file).then(function(base64) {
+          var mt = file.type || 'image/jpeg';
+          return { base64: base64, mimeType: mt };
+        });
+      });
+    }
+
+    // --- ステータスバー ---
+    function setStatus(state, text, progress) {
+      var bar = document.getElementById('statusBar');
+      var txt = document.getElementById('statusText');
+      var fill = document.getElementById('progressFill');
+
+      bar.className = 'status-bar ' + state;
+      txt.textContent = text;
+
+      if (progress !== undefined) {
+        fill.style.width = progress + '%';
+      }
+    }
+
+    var MAX_BASE64_SIZE = 3 * 1024 * 1024; // 3MB上限
+
+    function delay(ms) {
+      return new Promise(function(resolve) { setTimeout(resolve, ms); });
+    }
+
+    var GAS_URL = 'https://script.google.com/macros/s/AKfycbzR36cIA0jrhFOLhyGD2Y0ZHu3aN1_gS-4XSPXjgP1vMJFCJ_c6kfyCHj2qNHWH6gEvYQ/exec';
+    var MAX_RETRIES = 1;
+
+    // --- AI読み取り（リトライ付き） ---
+    function readReceiptWithAI(base64, fileName, mimeType) {
+      var sizeBytes = Math.round(base64.length * 3 / 4);
+      if (sizeBytes > MAX_BASE64_SIZE) {
+        var sizeMB = (sizeBytes / 1024 / 1024).toFixed(1);
+        return Promise.resolve([{
+          category: '', amount: '', date: '',
+          error: 'サイズ超過（' + sizeMB + 'MB）'
+        }]);
+      }
+
+      function sendToGAS() {
+        return fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'read',
+            fileName: fileName,
+            image: base64,
+            mimeType: mimeType || 'image/jpeg'
+          })
+        }).then(function(res) {
+          var ct = res.headers.get('content-type') || '';
+          if (!ct.includes('application/json')) {
+            return res.text().then(function(txt) {
+              throw new Error('GASがJSONを返しませんでした: ' + txt.substring(0, 200));
+            });
+          }
+          return res.json();
+        }).then(function(json) {
+          if (!json.success) {
+            throw new Error(json.error || 'GASがエラーを返しました');
+          }
+          return json.entries || [json.data || { category: '', amount: '', date: '' }];
+        });
+      }
+
+      function attempt(retryCount) {
+        return sendToGAS().catch(function(err) {
+          console.warn('[読み取りエラー] ' + fileName + ': ' + err.message);
+          if (retryCount < MAX_RETRIES) {
+            var waitMs = (retryCount + 1) * 2500;
+            var sec = Math.round(waitMs / 1000);
+            console.log('[リトライ] ' + fileName + ' (' + (retryCount + 1) + '/' + MAX_RETRIES + ')');
+            setStatus('processing', sec + '秒待機してリトライ中... ' + fileName, undefined);
+            return delay(waitMs).then(function() { return attempt(retryCount + 1); });
+          }
+          throw err;
+        });
+      }
+
+      return attempt(0);
+    }
+
+    // --- 画面1 → 画面2 ---
+    function handleSubmit() {
+      if (imageList.length === 0) return;
+
+      var btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+
+      var total = imageList.length;
+      var processedCount = 0;
+
+      setStatus('processing', '準備中...', 0);
+
+      var resultList = [];
+
+      function processOne(idx) {
+        if (idx >= imageList.length) {
+          onProcessComplete(resultList);
+          return;
         }
+        var item = imageList[idx];
+        var label = (idx + 1) + '/' + total + ' ' + item.file.name;
+
+        setStatus('processing', 'リサイズ中... ' + label, Math.round(idx / total * 100));
+
+        processFile(item.file).then(function(result) {
+          setStatus('processing', 'AI読み取り中... ' + label, Math.round((idx + 0.5) / total * 100));
+
+          return readReceiptWithAI(result.base64, item.file.name, result.mimeType).then(function(entries) {
+            console.log('[成功] ' + item.file.name + ' → ' + entries.length + '件');
+            for (var e = 0; e < entries.length; e++) {
+              resultList.push({
+                base64: result.base64,
+                fileName: item.file.name,
+                url: item.url,
+                mimeType: result.mimeType,
+                ai: entries[e]
+              });
+            }
+          });
+        }).catch(function(e) {
+          var msg = e.message || String(e);
+          console.error('[最終エラー] ' + item.file.name + ': ' + msg);
+          alert('読み取り失敗: ' + item.file.name + '\n\nエラー: ' + msg);
+          resultList.push({
+            base64: null,
+            fileName: item.file.name,
+            url: item.url,
+            error: true,
+            ai: { category: '', amount: '', date: '' }
+          });
+        }).then(function() {
+          processedCount++;
+          var pct = Math.round((processedCount / total) * 100);
+          setStatus('processing', '完了 ' + processedCount + '/' + total, pct);
+
+          if (idx + 1 < imageList.length) {
+            setStatus('processing', '次のファイルを準備中...', pct);
+            return delay(500);
+          }
+        }).then(function() {
+          processOne(idx + 1);
+        });
       }
 
-      if (photoFiles.length > 0) {
-        text += '【写真を選択】\n';
-        for (let i = 0; i < photoFiles.length; i++) {
-          text += '- ' + photoFiles[i].name + '\n';
+      processOne(0);
+    }
+
+    function onProcessComplete(resultList) {
+      var bar = document.getElementById('statusBar');
+      bar.className = 'status-bar';
+
+      var btn = document.getElementById('submitBtn');
+      btn.disabled = false;
+
+      renderConfirmScreen(resultList);
+      showScreen('screenConfirm');
+    }
+
+    // --- 画面2: 確認・修正 ---
+    var currentResultList = [];
+
+    function renderConfirmScreen(resultList) {
+      currentResultList = resultList;
+      var container = document.getElementById('receiptForms');
+      container.innerHTML = '';
+
+      var total = resultList.length;
+      var summary = document.getElementById('confirmSummary');
+      summary.textContent = total + '件の領収書を確認してください';
+
+      for (var i = 0; i < resultList.length; i++) {
+        var item = resultList[i];
+        var ai = item.ai || {};
+        var card = document.createElement('div');
+        card.className = 'receipt-card';
+
+        var header = document.createElement('div');
+        header.className = 'receipt-header';
+
+        var thumb;
+        var isImg = item.mimeType && item.mimeType.startsWith('image/');
+        if (isImg) {
+          thumb = document.createElement('img');
+          thumb.className = 'receipt-thumb';
+          thumb.src = item.url;
+          thumb.alt = item.fileName;
+        } else {
+          thumb = document.createElement('div');
+          thumb.className = 'receipt-thumb pdf-icon';
+          thumb.style.cssText = 'display:flex;align-items:center;justify-content:center;background:#e8f5e9;font-weight:bold;font-size:14px;color:#2e7d32;';
+          var ext = item.fileName.split('.').pop().toUpperCase();
+          thumb.textContent = ext || 'FILE';
         }
+
+        var titleArea = document.createElement('div');
+        var title = document.createElement('div');
+        title.className = 'receipt-title';
+        title.textContent = '領収書 ' + (i + 1) + '/' + total;
+        var fileLabel = document.createElement('div');
+        fileLabel.className = 'receipt-file';
+        fileLabel.textContent = item.fileName;
+        titleArea.appendChild(title);
+        titleArea.appendChild(fileLabel);
+
+        header.appendChild(thumb);
+        header.appendChild(titleArea);
+        card.appendChild(header);
+
+        var hasAiCategory = ai.category && ai.category !== '';
+        var hasAiAmount = ai.amount && ai.amount !== '';
+        var hasAiDate = ai.date && ai.date !== '';
+
+        card.appendChild(createFormGroup(
+          '費目',
+          createCategorySelect('category_' + i, ai.category || ''),
+          hasAiCategory ? 'AI読取' : '未読取（手動入力）'
+        ));
+        card.appendChild(createFormGroup(
+          '金額（税込）',
+          createInput('amount_' + i, 'number', ai.amount || '', '金額を入力'),
+          hasAiAmount ? 'AI読取' : '未読取（手動入力）'
+        ));
+        card.appendChild(createFormGroup(
+          '日付（領収書記載日）',
+          createInput('date_' + i, 'date', ai.date || '', ''),
+          hasAiDate ? 'AI読取' : '未読取（手動入力）'
+        ));
+
+        container.appendChild(card);
+      }
+    }
+
+    function createFormGroup(labelText, inputEl, badgeText) {
+      var group = document.createElement('div');
+      group.className = 'form-group';
+
+      var label = document.createElement('label');
+      label.className = 'form-label';
+      label.textContent = labelText;
+      if (inputEl.id) {
+        label.setAttribute('for', inputEl.id);
       }
 
-      if (text === '') {
-        text = 'まだ画像は選択されていません。';
+      if (badgeText) {
+        var badge = document.createElement('span');
+        var isAi = badgeText === 'AI読取';
+        badge.className = isAi ? 'ai-badge' : 'ai-badge manual';
+        badge.textContent = badgeText;
+        label.appendChild(badge);
       }
 
-      preview.textContent = text;
+      group.appendChild(label);
+      group.appendChild(inputEl);
+      return group;
+    }
+
+    function createInput(id, type, value, placeholder) {
+      var input = document.createElement('input');
+      input.className = 'form-input';
+      input.id = id;
+      input.type = type;
+      input.value = value || '';
+      if (placeholder) input.placeholder = placeholder;
+      return input;
+    }
+
+    function createCategorySelect(id, selectedValue) {
+      var select = document.createElement('select');
+      select.className = 'form-select';
+      select.id = id;
+
+      var defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = '-- 選択してください --';
+      select.appendChild(defaultOpt);
+
+      for (var i = 0; i < CATEGORIES.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = CATEGORIES[i];
+        opt.textContent = CATEGORIES[i];
+        if (CATEGORIES[i] === selectedValue) {
+          opt.selected = true;
+        }
+        select.appendChild(opt);
+      }
+
+      return select;
+    }
+
+    // --- 画面2 → 戻る ---
+    function goBack() {
+      showScreen('screenUpload');
+    }
+
+    // --- 画面2 → 画面3: 確定して保存 ---
+    function handleSave() {
+      var total = currentResultList.length;
+      var entries = [];
+
+      for (var i = 0; i < total; i++) {
+        var category = document.getElementById('category_' + i).value;
+        var amount = document.getElementById('amount_' + i).value;
+        var date = document.getElementById('date_' + i).value;
+
+        if (!category) {
+          alert('領収書 ' + (i + 1) + ' の費目を選択してください。');
+          document.getElementById('category_' + i).focus();
+          return;
+        }
+        if (!amount) {
+          alert('領収書 ' + (i + 1) + ' の金額を入力してください。');
+          document.getElementById('amount_' + i).focus();
+          return;
+        }
+        if (!date) {
+          alert('領収書 ' + (i + 1) + ' の日付を入力してください。');
+          document.getElementById('date_' + i).focus();
+          return;
+        }
+
+        entries.push({
+          fileName: currentResultList[i].fileName,
+          category: category,
+          amount: Number(amount),
+          date: date,
+          base64: currentResultList[i].base64
+        });
+      }
+
+      var saveBtn = document.querySelector('.primary-btn[onclick="handleSave()"]');
+      if (saveBtn) saveBtn.disabled = true;
+
+      var GAS_URL = 'https://script.google.com/macros/s/AKfycbzR36cIA0jrhFOLhyGD2Y0ZHu3aN1_gS-4XSPXjgP1vMJFCJ_c6kfyCHj2qNHWH6gEvYQ/exec';
+
+      var saveEntries = [];
+      for (var j = 0; j < entries.length; j++) {
+        saveEntries.push({
+          category: entries[j].category,
+          amount: entries[j].amount,
+          date: entries[j].date
+        });
+      }
+
+      fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'save', entries: saveEntries }),
+      }).then(function(res) { return res.json(); })
+        .then(function(json) {
+          if (!json.success) throw new Error(json.error);
+
+          var detailLines = [];
+          for (var k = 0; k < entries.length; k++) {
+            detailLines.push(
+              entries[k].category + '：'
+              + Number(entries[k].amount).toLocaleString() + '円（'
+              + entries[k].date + '）'
+            );
+          }
+
+          document.getElementById('doneDetail').innerHTML =
+            total + '件の領収書を登録しました。<br><br>' +
+            detailLines.join('<br>');
+
+          showScreen('screenDone');
+        })
+        .catch(function(err) {
+          alert('保存に失敗しました: ' + err.message);
+          if (saveBtn) saveBtn.disabled = false;
+        });
+    }
+
+    // --- 画面3 → 最初に戻る ---
+    function resetAll() {
+      for (var i = 0; i < imageList.length; i++) {
+        URL.revokeObjectURL(imageList[i].url);
+      }
+      imageList.length = 0;
+      currentResultList = [];
+      renderThumbnails();
+
+      var bar = document.getElementById('statusBar');
+      bar.className = 'status-bar';
+
+      showScreen('screenUpload');
     }
   </script>
 </body>
