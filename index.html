@@ -467,8 +467,8 @@
   <script>
     var imageList = [];
     var SUPPORTED_TYPES = null; // 全形式を受け入れる（Gemini側で判別）
-    var MAX_LONG_SIDE = 1200;
-    var JPEG_QUALITY = 0.65;
+    var MAX_LONG_SIDE = 1000;
+    var JPEG_QUALITY = 0.60;
 
     var CATEGORIES = [
       'タクシー代',
@@ -591,9 +591,14 @@
     // --- リサイズ（画像のみ。PDF等はそのままBase64） ---
     // 戻り値: { base64, mimeType }
     function processFile(file) {
+      var captureYear = new Date(file.lastModified || Date.now()).getFullYear();
       if (!isImageType(file)) {
         return fileToBase64(file).then(function(base64) {
-          return { base64: base64, mimeType: file.type || 'application/octet-stream' };
+          return {
+            base64: base64,
+            mimeType: file.type || 'application/octet-stream',
+            captureYear: captureYear
+          };
         });
       }
 
@@ -612,12 +617,20 @@
         ctx.drawImage(bitmap, 0, 0, w, h);
         bitmap.close();
 
-        return { base64: canvas.toDataURL('image/jpeg', JPEG_QUALITY), mimeType: 'image/jpeg' };
+        return {
+          base64: canvas.toDataURL('image/jpeg', JPEG_QUALITY),
+          mimeType: 'image/jpeg',
+          captureYear: captureYear
+        };
       }).catch(function() {
         // createImageBitmap非対応の形式（HEIC等）はそのまま送る
         return fileToBase64(file).then(function(base64) {
           var mt = file.type || 'image/jpeg';
-          return { base64: base64, mimeType: mt };
+          return {
+            base64: base64,
+            mimeType: mt,
+            captureYear: captureYear
+          };
         });
       });
     }
@@ -646,7 +659,7 @@
     var MAX_RETRIES = 1;
 
     // --- AI読み取り（リトライ付き） ---
-    function readReceiptWithAI(base64, fileName, mimeType) {
+    function readReceiptWithAI(base64, fileName, mimeType, captureYear) {
       var sizeBytes = Math.round(base64.length * 3 / 4);
       if (sizeBytes > MAX_BASE64_SIZE) {
         var sizeMB = (sizeBytes / 1024 / 1024).toFixed(1);
@@ -664,7 +677,8 @@
             action: 'read',
             fileName: fileName,
             image: base64,
-            mimeType: mimeType || 'image/jpeg'
+            mimeType: mimeType || 'image/jpeg',
+            captureYear: captureYear || new Date().getFullYear()
           })
         }).then(function(res) {
           var ct = res.headers.get('content-type') || '';
@@ -726,7 +740,7 @@
         processFile(item.file).then(function(result) {
           setStatus('processing', 'AI読み取り中... ' + label, Math.round((idx + 0.5) / total * 100));
 
-          return readReceiptWithAI(result.base64, item.file.name, result.mimeType).then(function(entries) {
+          return readReceiptWithAI(result.base64, item.file.name, result.mimeType, result.captureYear).then(function(entries) {
             console.log('[成功] ' + item.file.name + ' → ' + entries.length + '件');
             for (var e = 0; e < entries.length; e++) {
               resultList.push({
@@ -780,6 +794,8 @@
       currentResultList = resultList;
       var container = document.getElementById('receiptForms');
       container.innerHTML = '';
+      var saveBtn = document.querySelector('.primary-btn[onclick="handleSave()"]');
+      if (saveBtn) saveBtn.disabled = false;
 
       var total = resultList.length;
       var summary = document.getElementById('confirmSummary');
@@ -958,11 +974,19 @@
         });
       }
 
-      fetch(GAS_URL, {
+      var saveTimeoutMs = 20000;
+      var fetchPromise = fetch(GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'save', entries: saveEntries }),
-      }).then(function(res) { return res.json(); })
+      });
+      var timeoutPromise = new Promise(function(_, reject) {
+        setTimeout(function() {
+          reject(new Error('保存処理がタイムアウトしました。通信環境を確認して再試行してください。'));
+        }, saveTimeoutMs);
+      });
+
+      Promise.race([fetchPromise, timeoutPromise]).then(function(res) { return res.json(); })
         .then(function(json) {
           if (!json.success) throw new Error(json.error);
 

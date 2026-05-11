@@ -2,9 +2,8 @@
 // 設定値はすべてスクリプトプロパティから取得する
 // Apps Script エディタ → プロジェクトの設定 → スクリプトプロパティ で登録
 //
-//   GCP_PROJECT_ID  : Google Cloud プロジェクトID
-//   VERTEX_LOCATION : Vertex AI のリージョン（例: asia-northeast1）
-//   VERTEX_MODEL    : モデル名（例: gemini-2.5-flash）
+//   CLOUD_RUN_EXTRACT_URL   : Cloud Run /extract URL
+//   CLOUD_RUN_SHARED_SECRET : Cloud Run 呼び出し用シークレット（任意）
 //   SPREADSHEET_ID  : スプレッドシートID
 // =============================================
 
@@ -31,6 +30,82 @@ function getConfig(key) {
   return value;
 }
 
+// --- ファイル名からMIMEタイプを推測 ---
+function guessMimeType(fileName) {
+  var ext = (fileName || '').toLowerCase().split('.').pop();
+  var map = {
+    'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+    'png': 'image/png', 'gif': 'image/gif',
+    'webp': 'image/webp', 'bmp': 'image/bmp',
+    'tiff': 'image/tiff', 'tif': 'image/tiff',
+    'heic': 'image/heic', 'heif': 'image/heif',
+    'avif': 'image/avif', 'pdf': 'application/pdf'
+  };
+  return map[ext] || 'image/jpeg';
+}
+
+function pad2(num) {
+  return ('0' + num).slice(-2);
+}
+
+function isValidYmd(year, month, day) {
+  var y = Number(year);
+  var m = Number(month);
+  var d = Number(day);
+  if (!isFinite(y) || !isFinite(m) || !isFinite(d)) return false;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  var dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === (m - 1) && dt.getDate() === d;
+}
+
+// AIが返した日付を YYYY-MM-DD に正規化する。
+// 年がない場合は captureYear を使う。
+function normalizeReceiptDate(rawDate, captureYear) {
+  if (!rawDate) return '';
+  var src = String(rawDate).trim();
+  if (!src) return '';
+  var fallbackYear = Number(captureYear) || new Date().getFullYear();
+
+  // YYYY-MM-DD / YYYY/MM/DD
+  var ymd = src.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (ymd) {
+    var y = Number(ymd[1]);
+    var m = Number(ymd[2]);
+    var d = Number(ymd[3]);
+    if (!isValidYmd(y, m, d)) return '';
+    return y + '-' + pad2(m) + '-' + pad2(d);
+  }
+
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // MM/DD or M/D は「月/日」として扱う
+  var md = src.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+  if (md) {
+    var mm = Number(md[1]);
+    var dd = Number(md[2]);
+    if (!isValidYmd(fallbackYear, mm, dd)) return '';
+    if (new Date(fallbackYear, mm - 1, dd) > today && isValidYmd(fallbackYear - 1, mm, dd)) {
+      return (fallbackYear - 1) + '-' + pad2(mm) + '-' + pad2(dd);
+    }
+    return fallbackYear + '-' + pad2(mm) + '-' + pad2(dd);
+  }
+
+  // M月D日
+  var jp = src.match(/^(\d{1,2})月(\d{1,2})日$/);
+  if (jp) {
+    var jm = Number(jp[1]);
+    var jd = Number(jp[2]);
+    if (!isValidYmd(fallbackYear, jm, jd)) return '';
+    if (new Date(fallbackYear, jm - 1, jd) > today && isValidYmd(fallbackYear - 1, jm, jd)) {
+      return (fallbackYear - 1) + '-' + pad2(jm) + '-' + pad2(jd);
+    }
+    return fallbackYear + '-' + pad2(jm) + '-' + pad2(jd);
+  }
+
+  return '';
+}
+
 // ===== メイン処理 =====
 function doPost(e) {
   try {
@@ -50,20 +125,6 @@ function doPost(e) {
   }
 }
 
-// --- ファイル名からMIMEタイプを推測 ---
-function guessMimeType(fileName) {
-  var ext = (fileName || '').toLowerCase().split('.').pop();
-  var map = {
-    'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
-    'png': 'image/png', 'gif': 'image/gif',
-    'webp': 'image/webp', 'bmp': 'image/bmp',
-    'tiff': 'image/tiff', 'tif': 'image/tiff',
-    'heic': 'image/heic', 'heif': 'image/heif',
-    'avif': 'image/avif', 'pdf': 'application/pdf'
-  };
-  return map[ext] || 'image/jpeg';
-}
-
 // --- 読み取り処理 ---
 function handleRead(body) {
   if (!body.image) {
@@ -72,6 +133,7 @@ function handleRead(body) {
   var base64Data = body.image.replace(/^data:[^;]+;base64,/, '');
   var fileName = body.fileName || 'receipt.jpg';
   var mimeType = body.mimeType || guessMimeType(fileName);
+  var captureYear = Number(body.captureYear) || new Date().getFullYear();
   if (mimeType === 'application/octet-stream') {
     mimeType = guessMimeType(fileName);
   }
@@ -84,11 +146,15 @@ function handleRead(body) {
     });
   }
 
-  var aiResult = callGemini(base64Data, mimeType);
+  var aiResult = callCloudRunExtractor(base64Data, mimeType, captureYear);
+  var entries = aiResult.entries || [aiResult];
+  for (var i = 0; i < entries.length; i++) {
+    entries[i].date = normalizeReceiptDate(entries[i].date, captureYear);
+  }
 
   return jsonResponse({
     success: true,
-    entries: aiResult.entries || [aiResult]
+    entries: entries
   });
 }
 
@@ -134,146 +200,45 @@ function handleSave(body) {
   return jsonResponse({ success: true, saved: entries.length });
 }
 
-// --- Gemini API で領収書を読み取る ---
-function callGemini(base64Data, mimeType) {
-  var projectId = getConfig('GCP_PROJECT_ID');
-  var location = PropertiesService.getScriptProperties().getProperty('VERTEX_LOCATION') || 'asia-northeast1';
-  var model = PropertiesService.getScriptProperties().getProperty('VERTEX_MODEL') || 'gemini-2.5-flash';
-  var endpoint = 'https://' + location + '-aiplatform.googleapis.com/v1/projects/' + projectId
-    + '/locations/' + location + '/publishers/google/models/' + model + ':generateContent';
-  var token = ScriptApp.getOAuthToken();
-
-  var prompt = 'この画像またはPDFを分析して、経費情報をJSON形式で返してください。\n'
-    + 'JSONのみを返し、他のテキストは含めないでください。\n\n'
-    + '## 画像の種類を判別してください\n\n'
-    + '### 通常の領収書・レシートの場合\n'
-    + '1件分の情報を返してください:\n'
-    + '{"entries":[{"date":"YYYY-MM-DD","amount":"数値のみ","category":"費目"}]}\n\n'
-    + '### ICカード（PASMO/Suica等）の利用履歴の場合\n'
-    + 'マーカーやペンで色付け・印をつけた行だけを読み取り、複数件返してください。\n'
-    + '色付けされていない行は無視してください。\n'
-    + '{"entries":[{"date":"YYYY-MM-DD","amount":"数値のみ","category":"交通費（電車）"},{"date":"YYYY-MM-DD","amount":"数値のみ","category":"交通費（電車）"}]}\n\n'
-    + '## 費目の選択肢（この中から選ぶ）:\n'
-    + CATEGORIES.join('\n')
-    + '\n\n'
-    + '## ルール:\n'
-    + '- 金額は支払った合計金額を正の整数で返す（カンマ・円・マイナス記号は不要）\n'
-    + '- 負の数や0は返さない。読み取れない場合は空文字にする\n'
-    + '- ICカード履歴の場合も運賃の金額を正の整数で返す\n'
-    + '- 日付はYYYY-MM-DD形式\n'
-    + '- ICカード履歴の場合、費目は「交通費（電車）」にする\n'
-    + '- 読み取れない項目は空文字にする\n'
-    + '- 必ず{"entries":[...]}の形式で返す';
+// --- Cloud Run に読み取りを委譲 ---
+function callCloudRunExtractor(base64Data, mimeType, captureYear) {
+  var endpoint = getConfig('CLOUD_RUN_EXTRACT_URL');
+  var sharedSecret = PropertiesService.getScriptProperties().getProperty('CLOUD_RUN_SHARED_SECRET');
 
   var payload = {
-    contents: [{
-      role: 'user',
-      parts: [
-        { text: prompt },
-        {
-          inlineData: {
-            mimeType: mimeType || 'image/jpeg',
-            data: base64Data
-          }
-        }
-      ]
-    }]
+    imageBase64: base64Data,
+    mimeType: mimeType || 'image/jpeg',
+    captureYear: captureYear || new Date().getFullYear()
   };
 
   var options = {
     method: 'post',
-    headers: {
-      Authorization: 'Bearer ' + token
-    },
     contentType: 'application/json',
     payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+    muteHttpExceptions: true,
+    headers: sharedSecret ? { 'x-shared-secret': sharedSecret } : {}
   };
 
-  var MAX_GEMINI_RETRIES = 3;
-  var json = null;
+  var response = UrlFetchApp.fetch(endpoint, options);
+  var responseCode = response.getResponseCode();
+  var text = response.getContentText();
+  var json = JSON.parse(text);
 
-  for (var retry = 0; retry <= MAX_GEMINI_RETRIES; retry++) {
-    var response = UrlFetchApp.fetch(endpoint, options);
-    var rawText = response.getContentText();
-    var httpCode = response.getResponseCode();
-    Logger.log('Gemini HTTP ' + httpCode + ' (試行' + (retry + 1) + ')');
+  if (responseCode >= 300 || !json.success) {
+    throw new Error('Cloud Runエラー: ' + (json.error || text));
+  }
 
-    json = JSON.parse(rawText);
-
-    if (json.error) {
-      var errCode = json.error.code || 0;
-      var errMsg = json.error.message || '';
-      Logger.log('Gemini API エラー: ' + errCode + ' ' + errMsg);
-
-      // 429=レート制限, 503=サーバー過負荷 → リトライ
-      if ((errCode === 429 || errCode === 503) && retry < MAX_GEMINI_RETRIES) {
-        var waitSec = Math.min(10 + retry * 10, 30); // 10秒, 20秒, 30秒
-        Logger.log('レート制限: ' + waitSec + '秒待機して再試行...');
-        Utilities.sleep(waitSec * 1000);
-        continue;
-      }
-      throw new Error('Vertex AI APIエラー: ' + errMsg);
+  var result = { entries: json.entries || [] };
+  for (var i = 0; i < result.entries.length; i++) {
+    var entry = result.entries[i];
+    if (CATEGORIES.indexOf(entry.category) === -1) {
+      entry.category = '';
     }
-
-    break; // 成功
+    var amt = String(entry.amount || '').replace(/[,\s円¥\\-]/g, '');
+    var num = parseInt(amt, 10);
+    entry.amount = (num > 0 && isFinite(num)) ? String(num) : '';
   }
-
-  if (!json.candidates || json.candidates.length === 0) {
-    Logger.log('Gemini: candidates が空です');
-    throw new Error('Gemini が応答を返しませんでした');
-  }
-
-  // gemini-2.5-flash は思考パートを含む場合があるため、
-  // 全パートからテキストを結合して JSON を探す
-  var parts = json.candidates[0].content.parts;
-  var allText = '';
-  for (var p = 0; p < parts.length; p++) {
-    if (parts[p].text && !parts[p].thought) {
-      allText += parts[p].text;
-    }
-  }
-
-  // 思考パート以外にテキストがない場合、全パートから探す
-  if (!allText) {
-    for (var p2 = 0; p2 < parts.length; p2++) {
-      if (parts[p2].text) {
-        allText += parts[p2].text;
-      }
-    }
-  }
-
-  Logger.log('Gemini text: ' + allText.substring(0, 500));
-
-  var jsonMatch = allText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    Logger.log('JSON抽出失敗。テキスト全文: ' + allText);
-    throw new Error('Gemini応答からJSONを抽出できませんでした');
-  }
-
-  try {
-    var result = JSON.parse(jsonMatch[0]);
-
-    if (!result.entries || !Array.isArray(result.entries)) {
-      result = { entries: [result] };
-    }
-
-    for (var i = 0; i < result.entries.length; i++) {
-      var entry = result.entries[i];
-      if (CATEGORIES.indexOf(entry.category) === -1) {
-        entry.category = '';
-      }
-      var amt = String(entry.amount || '').replace(/[,\s円¥\\-]/g, '');
-      var num = parseInt(amt, 10);
-      entry.amount = (num > 0 && isFinite(num)) ? String(num) : '';
-    }
-
-    Logger.log('Gemini 解析成功: ' + result.entries.length + '件');
-    return result;
-  } catch (parseErr) {
-    Logger.log('JSONパース失敗: ' + jsonMatch[0]);
-    throw new Error('Gemini応答のJSONパースに失敗: ' + parseErr.message);
-  }
+  return result;
 }
 
 // --- JSON レスポンスを返す ---
@@ -284,8 +249,6 @@ function jsonResponse(obj) {
 }
 
 // ===== 初期セットアップ用 =====
-// スプレッドシートに費目シート（自動フィルタ）を一括作成する
-// Apps Script エディタから手動で1回だけ実行してください
 function setupCategorySheets() {
   var spreadsheetId = getConfig('SPREADSHEET_ID');
   var ss = SpreadsheetApp.openById(spreadsheetId);
@@ -293,7 +256,7 @@ function setupCategorySheets() {
   var master = ss.getSheetByName(MASTER_SHEET_NAME);
   if (!master) {
     master = ss.insertSheet(MASTER_SHEET_NAME, 0);
-    master.appendRow(['登録日時', '日付', '費目', '金額', '画像URL']);
+    master.appendRow(['登録日時', '日付', '費目', '金額']);
     master.getRange('1:1').setFontWeight('bold');
   }
 
@@ -310,6 +273,14 @@ function setupCategorySheets() {
     var formula = '=QUERY(\'' + MASTER_SHEET_NAME + '\'!A:D, "SELECT * WHERE C = \'' + name + '\' ORDER BY A DESC", 1)';
     sheet.getRange('A1').setFormula(formula);
     sheet.getRange('A1').setNote('この表は「' + MASTER_SHEET_NAME + '」シートから自動取得しています。編集は「' + MASTER_SHEET_NAME + '」シートで行ってください。');
+
+    sheet.getRange('G1').setValue('月別集計');
+    sheet.getRange('G2').setFormula(
+      "=IFERROR(QUERY({ARRAYFORMULA(TEXT(B2:B,\"yyyy-mm\")), D2:D}, " +
+      "\"select Col1, sum(Col2) where Col1 is not null and Col2 > 0 group by Col1 order by Col1 desc " +
+      "label Col1 '月', sum(Col2) '合計金額'\", 0), {\"月\",\"合計金額\"})"
+    );
+    sheet.getRange('H:H').setNumberFormat('#,##0');
   }
 
   Logger.log('セットアップ完了: マスターシート + ' + CATEGORIES.length + '個の費目シートを作成しました');
@@ -319,9 +290,7 @@ function setupCategorySheets() {
 function testConfig() {
   var props = PropertiesService.getScriptProperties().getProperties();
   Logger.log('設定済みプロパティ: ' + Object.keys(props).join(', '));
-  Logger.log('GCP_PROJECT_ID: ' + (props['GCP_PROJECT_ID'] ? '設定済み' : '未設定'));
-  Logger.log('VERTEX_LOCATION: ' + (props['VERTEX_LOCATION'] ? props['VERTEX_LOCATION'] : '未設定（asia-northeast1を利用）'));
-  Logger.log('VERTEX_MODEL: ' + (props['VERTEX_MODEL'] ? props['VERTEX_MODEL'] : '未設定（gemini-2.5-flashを利用）'));
+  Logger.log('CLOUD_RUN_EXTRACT_URL: ' + (props['CLOUD_RUN_EXTRACT_URL'] ? '設定済み' : '未設定'));
+  Logger.log('CLOUD_RUN_SHARED_SECRET: ' + (props['CLOUD_RUN_SHARED_SECRET'] ? '設定済み' : '未設定（認証なし）'));
   Logger.log('SPREADSHEET_ID: ' + (props['SPREADSHEET_ID'] ? '設定済み' : '未設定'));
 }
-
